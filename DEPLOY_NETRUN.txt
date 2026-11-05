@@ -1,0 +1,13 @@
+FaTZaF Messenger — deployment package
+
+Project files are at the ZIP root: manage.py, requirements.txt, pyproject.toml, FaTZaF/, OurSite/, templates/, static/.
+
+Important: do not set the package name to OurSite. It is a local Django app, not a PyPI dependency. Install dependencies from requirements.txt.
+
+Build/install: pip install -r requirements.txt
+Before serving: python manage.py migrate && python manage.py collectstatic --noinput
+WSGI entrypoint: FaTZaF.wsgi:application
+ASGI entrypoint: FaTZaF.asgi:application
+Start command (WSGI): gunicorn FaTZaF.wsgi:application
+
+Set DJANGO_SECRET_KEY to a strong secret and DJANGO_ALLOWED_HOSTS to the domain assigned by your host. Set DJANGO_CSRF_TRUSTED_ORIGINS to https://your-domain if required. SQLite is used by default and may not persist on all free hosting platforms.

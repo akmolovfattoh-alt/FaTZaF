@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fatzaf-messenger"
+version = "1.0.0"
+description = "FaTZaF Messenger Django application"
+requires-python = ">=3.10"
+dependencies = ["Django>=5.2,<5.3", "Pillow>=10.0", "gunicorn>=23.0", "whitenoise>=6.8"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["FaTZaF*", "OurSite*"]
