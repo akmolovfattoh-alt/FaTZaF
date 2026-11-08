@@ -8,8 +8,10 @@ from django.utils import timezone
 from .forms import RegisterForm, ProfileForm, MessageForm
 from .models import Chat, Contact, Message, Profile
 
+
 def ensure_profile(user):
     Profile.objects.get_or_create(user=user)
+
 
 def register_view(request):
     if request.user.is_authenticated: return redirect('home')
@@ -18,6 +20,7 @@ def register_view(request):
         user = form.save(); ensure_profile(user); login(request, user)
         return redirect('home')
     return render(request, 'registration/register.html', {'form': form})
+
 
 @login_required
 def home(request):
@@ -35,6 +38,7 @@ def home(request):
         ensure_profile(contact.person)
     return render(request, 'chat/home.html', {'contacts':contacts,'chats':chats,'users':users,'query':query,'all_users':User.objects.exclude(pk=request.user.pk).order_by('username')})
 
+
 @login_required
 def add_contact(request, user_id):
     person = get_object_or_404(User, pk=user_id)
@@ -48,6 +52,7 @@ def add_contact(request, user_id):
             chat = Chat.objects.create(chat_type=Chat.DIRECT); chat.participants.add(request.user, person)
         return redirect('chat_detail', chat_id=chat.id)
     return redirect('home')
+
 
 @login_required
 def create_chat(request):
@@ -69,19 +74,25 @@ def create_chat(request):
     messages.success(request, 'Канал создан.' if kind == Chat.CHANNEL else 'Группа создана.')
     return redirect('chat_detail', chat_id=chat.id)
 
+
 @login_required
 def chat_detail(request, chat_id):
     chat = get_object_or_404(Chat, pk=chat_id, participants=request.user)
     ensure_profile(request.user)
     Profile.objects.filter(user=request.user).update(last_seen=timezone.now())
-    form = MessageForm(request.POST or None)
+    form = MessageForm(request.POST or None,request.FILES or None)
     if request.method == 'POST' and form.is_valid():
         if chat.chat_type == Chat.CHANNEL and not chat.admins.filter(pk=request.user.pk).exists():
             messages.error(request, 'Писать в канал могут только администраторы.')
             return redirect('chat_detail', chat_id=chat.id)
-        message = form.save(commit=False); message.chat = chat; message.sender = request.user; message.save()
+        message = form.save(commit=False)
+        message.chat = chat
+        message.sender = request.user
+        message.save()
+
         chat.save()
         return redirect('chat_detail', chat_id=chat.id)
+
     other_users = chat.participants.exclude(pk=request.user.pk).select_related('profile')
     title = chat.title or ', '.join(u.username for u in other_users) or 'Избранное'
     return render(request, 'chat/detail.html', {'chat':chat,'chat_title':title,'other_users':other_users,'form':form,'messages_list':chat.messages.select_related('sender','forwarded_from','forwarded_from__sender'),'forward_targets':request.user.chats.exclude(pk=chat.pk).order_by('title')})
@@ -93,7 +104,18 @@ def forward_message(request, message_id):
         target_id = request.POST.get('target_chat')
         target = get_object_or_404(Chat, pk=target_id, participants=request.user)
         if target.chat_type != Chat.CHANNEL or target.admins.filter(pk=request.user.pk).exists():
-            Message.objects.create(chat=target, sender=request.user, body=message.body, forwarded_from=message)
+            new_message = Message(
+                chat=target,
+                sender=request.user,
+                body=message.body,
+                forwarded_from=message
+            )
+
+            if message.attachment:
+                new_message.attachment = message.attachment.name
+
+            new_message.save()
+            target.save()
             target.save()
             messages.success(request, 'Сообщение переслано.')
         else:

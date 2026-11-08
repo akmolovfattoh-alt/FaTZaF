@@ -31,10 +31,40 @@ class Chat(models.Model):
     def __str__(self): return self.title or 'Chat #' + str(self.pk)
 
 class Message(models.Model):
-    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name='messages')
-    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sent_messages')
-    body = models.TextField(max_length=5000)
-    forwarded_from = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='forwards')
+    chat = models.ForeignKey(
+        Chat,
+        on_delete=models.CASCADE,
+        related_name='messages'
+    )
+
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='sent_messages'
+    )
+
+    body = models.TextField(max_length=5000, blank=True)
+
+    # Фото, видео и документы
+    attachment = models.FileField(
+        upload_to='chat_files/%Y/%m/',
+        blank=True,
+        null=True
+    )
+
+    forwarded_from = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='forwards'
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     edited_at = models.DateTimeField(null=True, blank=True)
-    class Meta: ordering = ['created_at']
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f'{self.sender.username}: {self.body[:30]}'

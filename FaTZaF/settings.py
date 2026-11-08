@@ -121,6 +121,8 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 204 * 204
+DATA_UPLOAD_MAX_MEMORY_SIZE = 30 * 204 * 204
 STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
