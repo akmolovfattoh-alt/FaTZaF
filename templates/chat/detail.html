@@ -166,9 +166,11 @@
 
         <div class="attachment-controls">
 
-            <label for="id_attachment" class="attach-button">
+            <label for="id_attachment" class="attach-button" title="Прикрепить файл">
                 📎
             </label>
+            <button type="button" id="record-button" class="record-button" title="Записать голосовое">🎙️</button>
+            <span id="record-status" aria-live="polite"></span>
 
             {{ form.attachment }}
 
@@ -194,7 +196,66 @@
     {% endif %}
 </main>
 <script>
-    const area=document.getElementById('messages-area');if(area)area.scrollTop=area.scrollHeight;function insertEmoji(emoji){const field=document.querySelector('.composer textarea');if(!field)return;const start=field.selectionStart,end=field.selectionEnd;field.value=field.value.slice(0,start)+emoji+field.value.slice(end);field.focus();field.selectionStart=field.selectionEnd=start+emoji.length;}
+(() => {
+  const area = document.getElementById('messages-area');
+  if (area) area.scrollTop = area.scrollHeight;
+  const form = document.getElementById('composer');
+  const field = form?.querySelector('textarea');
+  const emojiButtons = document.querySelectorAll('.emoji-btn');
+  emojiButtons.forEach(btn => btn.addEventListener('click', () => {
+    if (!field) return;
+    const emoji = btn.textContent.trim();
+    const start = field.selectionStart ?? field.value.length;
+    const end = field.selectionEnd ?? start;
+    field.value = field.value.slice(0, start) + emoji + field.value.slice(end);
+    field.focus();
+    const caret = start + emoji.length;
+    field.setSelectionRange(caret, caret);
+  }));
+  const attachmentInput = document.getElementById('id_attachment');
+  attachmentInput?.addEventListener('change', function () {
+    const fileName = document.getElementById('file-name');
+    if (fileName) fileName.textContent = this.files?.length ? this.files[0].name : 'Файл не выбран';
+  });
+  const recordButton = document.getElementById('record-button');
+  const status = document.getElementById('record-status');
+  let recorder = null, chunks = [], stream = null;
+  recordButton?.addEventListener('click', async () => {
+    if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      if (status) status.textContent = 'Запись не поддерживается этим браузером'; return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({audio: true});
+      const mime = ['audio/webm;codecs=opus','audio/webm','audio/ogg'].find(type => MediaRecorder.isTypeSupported(type));
+      recorder = mime ? new MediaRecorder(stream, {mimeType:mime}) : new MediaRecorder(stream);
+      chunks = [];
+      recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
+      recorder.onstop = () => {
+        recordButton.textContent = '🎙️'; recordButton.classList.remove('recording');
+        stream?.getTracks().forEach(track => track.stop());
+        const blob = new Blob(chunks, {type: recorder.mimeType || 'audio/webm'});
+        if (!attachmentInput || !form || !blob.size) { if(status) status.textContent = 'Не удалось подготовить аудио'; return; }
+        const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm';
+        const audioFile = new File([blob], `voice-${Date.now()}.${ext}`, {type: blob.type});
+        const transfer = new DataTransfer(); transfer.items.add(audioFile); attachmentInput.files = transfer.files;
+        const fileName = document.getElementById('file-name'); if (fileName) fileName.textContent = audioFile.name;
+        if (status) status.textContent = 'Голосовое готово — отправляем…';
+        form.requestSubmit();
+      };
+      recorder.start();
+      recordButton.textContent = '⏹'; recordButton.classList.add('recording');
+      if (status) status.textContent = 'Идёт запись… нажми ⏹ для завершения';
+    } catch (error) {
+      if (status) status.textContent = error.name === 'NotAllowedError' ? 'Разреши доступ к микрофону в браузере' : 'Не удалось включить микрофон';
+    }
+  });
+  recordButton?.addEventListener('record-finished', () => {});
+  if (recordButton) {
+    const reset = () => { recordButton.textContent = '🎙️'; recordButton.classList.remove('recording'); };
+    recordButton.addEventListener('click', () => { if (recorder?.state === 'inactive') reset(); });
+  }
+})();
 </script>
 <script>
 const attachmentInput = document.getElementById('id_attachment');
